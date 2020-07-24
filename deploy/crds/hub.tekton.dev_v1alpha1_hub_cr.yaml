@@ -1,0 +1,7 @@
+apiVersion: hub.tekton.dev/v1alpha1
+kind: Hub
+metadata:
+  name: example-hub
+spec:
+  # Add fields here
+  size: 3
