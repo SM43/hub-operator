@@ -1,7 +1,19 @@
 apiVersion: hub.tekton.dev/v1alpha1
 kind: Hub
 metadata:
-  name: example-hub
+  name: hub-ex
 spec:
-  # Add fields here
-  size: 3
+  db:
+    name: hub
+    user: postgres
+    password: postgres
+  api:
+    image: quay.io/tekton-hub/api-936d7f73a71b01db389e6ee1aed65be8:dab60c9
+    clientId: ''
+    clientSecret: ''
+    jwtSigningKey: ''
+  migration:
+    image: quay.io/tekton-hub/db-7c709453d839fd50af2ea4e9edf9cbe1:993bd20
+  ui:
+    image: quay.io/tekton-hub/ui:dab60c9
+

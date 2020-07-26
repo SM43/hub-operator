@@ -9,10 +9,38 @@ import (
 
 // HubSpec defines the desired state of Hub
 type HubSpec struct {
-	Hello string `json:"hello"`
+	Db        DBConfig  `json:"db"`
+	API       API       `json:"api"`
+	Migration Migration `json:"migration"`
+	UI        UI        `json:"ui"`
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+}
+
+// DBConfig defines configuration for db
+type DBConfig struct {
+	Name     string `json:"name"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+}
+
+// Migration defines configuration for db-migration
+type Migration struct {
+	Image string `json:"image"`
+}
+
+// API defines configuration for api
+type API struct {
+	Image         string `json:"image"`
+	ClientID      string `json:"clientId"`
+	ClientSecret  string `json:"clientSecret"`
+	JwtSigningKey string `json:"jwtSigningKey"`
+}
+
+// UI defines configuration for ui
+type UI struct {
+	Image string `json:"image"`
 }
 
 // HubStatus defines the observed state of Hub
