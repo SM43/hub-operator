@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	openshiftv1 "github.com/openshift/api/route/v1"
+	routev1 "github.com/openshift/api/route/v1"
 	hubv1alpha1 "github.com/sm43/hub-operator/pkg/apis/hub/v1alpha1"
 	v1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -140,24 +140,22 @@ func (r *ReconcileHub) Reconcile(request reconcile.Request) (reconcile.Result, e
 			return reconcile.Result{}, err
 		}
 
-		// TODO: Create Route for API
-		// apiRoute := r.CreateAPIRoute(instance)
-		// err = r.client.Create(context.TODO(), apiRoute)
-		// if err != nil {
-		// 	reqLogger.Error(err, "Failed to create api route")
-		// 	return reconcile.Result{}, err
-		// }
+		apiRoute := r.CreateAPIRoute(instance)
+		err = r.client.Create(context.TODO(), apiRoute)
+		if err != nil {
+			reqLogger.Error(err, "Failed to create api route")
+			return reconcile.Result{}, err
+		}
 
-		// foundAPIRoute := &openshiftv1.Route{}
-		// err = r.client.Get(context.TODO(), types.NamespacedName{Name: "api", Namespace: instance.Namespace}, foundAPIRoute)
-		// if err != nil && errors.IsNotFound(err) {
-		// 	reqLogger.Error(err, "Service Not found")
-		// 	return reconcile.Result{}, err
-		// }
-		// reqLogger.Info("-----Route : ", foundAPIRoute.Spec.Host)
+		foundAPIRoute := &routev1.Route{}
+		err = r.client.Get(context.TODO(), types.NamespacedName{Name: "api", Namespace: instance.Namespace}, foundAPIRoute)
+		if err != nil && errors.IsNotFound(err) {
+			reqLogger.Error(err, "Service Not found")
+			return reconcile.Result{}, err
+		}
 
-		// TODO: Add API Route in config map
-		uiConfig := r.CreateUIConfigMap(instance)
+		route := "https://" + foundAPIRoute.Spec.Host
+		uiConfig := r.CreateUIConfigMap(instance, route)
 		err = r.client.Create(context.TODO(), uiConfig)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create ui config map")
@@ -175,6 +173,13 @@ func (r *ReconcileHub) Reconcile(request reconcile.Request) (reconcile.Result, e
 		err = r.client.Create(context.TODO(), uiService)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create ui service")
+			return reconcile.Result{}, err
+		}
+
+		uiRoute := r.CreateUIRoute(instance)
+		err = r.client.Create(context.TODO(), uiRoute)
+		if err != nil {
+			reqLogger.Error(err, "Failed to create ui route")
 			return reconcile.Result{}, err
 		}
 
@@ -525,9 +530,9 @@ func (r ReconcileHub) CreateAPIService(instance *hubv1alpha1.Hub) *corev1.Servic
 			Selector: map[string]string{"app": "api"},
 			Ports: []corev1.ServicePort{
 				{
-					Port: 8000,
+					Port: 5000,
 					TargetPort: intstr.IntOrString{
-						IntVal: 8000,
+						IntVal: 5000,
 					},
 				},
 			},
@@ -547,21 +552,21 @@ func (r ReconcileHub) CreateAPIService(instance *hubv1alpha1.Hub) *corev1.Servic
 }
 
 // CreateAPIRoute creates api route
-func (r ReconcileHub) CreateAPIRoute(instance *hubv1alpha1.Hub) *openshiftv1.Route {
-	route := &openshiftv1.Route{
+func (r ReconcileHub) CreateAPIRoute(instance *hubv1alpha1.Hub) *routev1.Route {
+	route := &routev1.Route{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "api",
 			Namespace: instance.Namespace,
 			Labels:    map[string]string{"app": "api"},
 		},
-		Spec: openshiftv1.RouteSpec{
-			To: openshiftv1.RouteTargetReference{
+		Spec: routev1.RouteSpec{
+			To: routev1.RouteTargetReference{
 				Kind: "Service",
 				Name: "api",
 			},
-			TLS: &openshiftv1.TLSConfig{
-				InsecureEdgeTerminationPolicy: openshiftv1.InsecureEdgeTerminationPolicyRedirect,
-				Termination:                   openshiftv1.TLSTerminationEdge,
+			TLS: &routev1.TLSConfig{
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+				Termination:                   routev1.TLSTerminationEdge,
 			},
 		},
 	}
@@ -661,7 +666,7 @@ func (r ReconcileHub) CreateDBMigration(instance *hubv1alpha1.Hub) *batchv1.Job 
 }
 
 // CreateUIConfigMap creates ui configmap
-func (r ReconcileHub) CreateUIConfigMap(instance *hubv1alpha1.Hub) *corev1.ConfigMap {
+func (r ReconcileHub) CreateUIConfigMap(instance *hubv1alpha1.Hub, route string) *corev1.ConfigMap {
 	config := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ui",
@@ -669,7 +674,7 @@ func (r ReconcileHub) CreateUIConfigMap(instance *hubv1alpha1.Hub) *corev1.Confi
 			Labels:    map[string]string{"app": "ui"},
 		},
 		Data: map[string]string{
-			"API_URL":      "",
+			"API_URL":      route,
 			"GH_CLIENT_ID": instance.Spec.API.ClientID,
 		},
 	}
@@ -792,6 +797,38 @@ func (r ReconcileHub) CreateUIService(instance *hubv1alpha1.Hub) *corev1.Service
 		},
 	})
 	return s
+}
+
+// CreateUIRoute creates ui route
+func (r ReconcileHub) CreateUIRoute(instance *hubv1alpha1.Hub) *routev1.Route {
+	route := &routev1.Route{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ui",
+			Namespace: instance.Namespace,
+			Labels:    map[string]string{"app": "ui"},
+		},
+		Spec: routev1.RouteSpec{
+			To: routev1.RouteTargetReference{
+				Kind: "Service",
+				Name: "ui",
+			},
+			TLS: &routev1.TLSConfig{
+				InsecureEdgeTerminationPolicy: routev1.InsecureEdgeTerminationPolicyRedirect,
+				Termination:                   routev1.TLSTerminationEdge,
+			},
+		},
+	}
+	route.SetOwnerReferences([]metav1.OwnerReference{
+		{
+			APIVersion:         instance.APIVersion,
+			Kind:               instance.Kind,
+			Name:               instance.Namespace,
+			UID:                instance.UID,
+			Controller:         nil,
+			BlockOwnerDeletion: nil,
+		},
+	})
+	return route
 }
 
 // // CreateDBPvc creates db pvc

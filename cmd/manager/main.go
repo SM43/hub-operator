@@ -33,6 +33,8 @@ import (
 	"github.com/sm43/hub-operator/pkg/controller"
 	"github.com/sm43/hub-operator/version"
 
+	routev1 "github.com/openshift/api/route/v1"
+
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	kubemetrics "github.com/operator-framework/operator-sdk/pkg/kube-metrics"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
@@ -134,6 +136,12 @@ func main() {
 
 	// Setup Scheme for all resources
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
+		log.Error(err, "")
+		os.Exit(1)
+	}
+
+	//Add route scheme
+	if err := routev1.AddToScheme(mgr.GetScheme()); err != nil {
 		log.Error(err, "")
 		os.Exit(1)
 	}
